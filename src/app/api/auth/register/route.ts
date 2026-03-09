@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createSession, hashPassword } from "@/lib/auth";
+import { createSession, getSessionCookieConfig, SESSION_COOKIE, hashPassword } from "@/lib/auth";
 import { createUser } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -30,9 +30,16 @@ export async function POST(request: Request) {
       passwordHash: hashPassword(password),
     });
 
-    await createSession(user.id);
+    const session = createSession(user.id);
+    const response = NextResponse.json({ ok: true, user });
 
-    return NextResponse.json({ ok: true, user });
+    response.cookies.set({
+      ...getSessionCookieConfig(session.expiresAt),
+      name: SESSION_COOKIE,
+      value: session.token,
+    });
+
+    return response;
   } catch (error) {
     const message =
       error instanceof Error &&

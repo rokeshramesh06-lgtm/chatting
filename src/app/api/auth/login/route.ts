@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { createSession, verifyPassword } from "@/lib/auth";
+import {
+  createSession,
+  getSessionCookieConfig,
+  SESSION_COOKIE,
+  verifyPassword,
+} from "@/lib/auth";
 import { findUserForLogin } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -20,7 +25,14 @@ export async function POST(request: Request) {
     );
   }
 
-  await createSession(user.id);
+  const session = createSession(user.id);
+  const response = NextResponse.json({ ok: true });
 
-  return NextResponse.json({ ok: true });
+  response.cookies.set({
+    ...getSessionCookieConfig(session.expiresAt),
+    name: SESSION_COOKIE,
+    value: session.token,
+  });
+
+  return response;
 }

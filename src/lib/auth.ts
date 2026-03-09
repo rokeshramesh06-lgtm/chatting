@@ -10,11 +10,22 @@ import {
   insertSession,
 } from "@/lib/db";
 
-const SESSION_COOKIE = "chatting_session";
+export const SESSION_COOKIE = "chatting_session";
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 30;
 
-function hashToken(token: string) {
+export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+export function getSessionCookieConfig(expiresAt: string) {
+  return {
+    name: SESSION_COOKIE,
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: new Date(expiresAt),
+  };
 }
 
 export function hashPassword(password: string) {
@@ -36,23 +47,17 @@ export function verifyPassword(password: string, storedHash: string) {
   return saved.length === incoming.length && timingSafeEqual(saved, incoming);
 }
 
-export async function createSession(userId: number) {
+export function createSession(userId: number) {
   const token = randomBytes(32).toString("hex");
   const tokenHash = hashToken(token);
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
 
   insertSession({ userId, tokenHash, expiresAt });
 
-  const cookieStore = await cookies();
-  cookieStore.set({
-    name: SESSION_COOKIE,
-    value: token,
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires: new Date(expiresAt),
-  });
+  return {
+    token,
+    expiresAt,
+  };
 }
 
 export async function getSessionUser() {
@@ -82,13 +87,8 @@ export async function requireSessionUser() {
   return user;
 }
 
-export async function destroySession() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
-
+export function destroySession(token?: string) {
   if (token) {
     deleteSessionByTokenHash(hashToken(token));
   }
-
-  cookieStore.delete(SESSION_COOKIE);
 }
