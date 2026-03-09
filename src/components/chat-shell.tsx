@@ -15,12 +15,15 @@ import {
   Camera,
   CirclePlus,
   Paperclip,
+  Phone,
   Search,
   SendHorizontal,
   UsersRound,
+  Video,
   X,
 } from "lucide-react";
 
+import { CallPanels } from "@/components/call-panels";
 import {
   AttachmentPreview,
   Avatar,
@@ -33,6 +36,7 @@ import {
   makeId,
   sameDay,
 } from "@/components/chat-ui";
+import { useCallManager } from "@/hooks/use-call-manager";
 import type {
   BootstrapPayload,
   ChatMessage,
@@ -118,7 +122,7 @@ export function ChatShell({
         : selectedDirectContact?.status || "offline"
     : "";
 
-  const pushToast = useEffectEvent((title: string, body: string) => {
+  function pushToast(title: string, body: string) {
     const id = makeId();
     startTransition(() => {
       setToasts((current) => [...current, { id, title, body }]);
@@ -126,6 +130,28 @@ export function ChatShell({
     window.setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
     }, 4200);
+  }
+
+  const {
+    activeCall,
+    incomingCall,
+    isStartingCall,
+    localVideoRef,
+    remoteAudioRef,
+    remoteVideoRef,
+    startCall,
+    acceptIncomingCall,
+    declineIncomingCall,
+    endCall,
+    toggleMute,
+    toggleVideo,
+    handleRealtimeCallEvent,
+  } = useCallManager({
+    currentUser,
+    selectedConversation,
+    selectedDirectContact,
+    onError: setError,
+    onToast: pushToast,
   });
 
   async function refreshBootstrap(preferredId?: number | null) {
@@ -185,6 +211,10 @@ export function ChatShell({
   });
 
   const handleRealtime = useEffectEvent(async (event: RealtimeEvent) => {
+    if (await handleRealtimeCallEvent(event)) {
+      return;
+    }
+
     if (event.kind === "message") {
       if (event.senderId !== currentUser.id) {
         pushToast(event.senderName, event.preview);
@@ -457,6 +487,26 @@ export function ChatShell({
                 <h1 className="truncate font-display text-2xl font-semibold text-slate-900">{selectedConversation.name}</h1>
                 <p className="mt-1 text-sm text-slate-500">{conversationStatus}</p>
               </div>
+              {selectedConversation.type === "direct" ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    className="rounded-full border border-slate-200 bg-white p-3 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isStartingCall || Boolean(activeCall)}
+                    onClick={() => void startCall("audio")}
+                    type="button"
+                  >
+                    <Phone className="h-4 w-4" />
+                  </button>
+                  <button
+                    className="rounded-full border border-slate-200 bg-white p-3 text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isStartingCall || Boolean(activeCall)}
+                    onClick={() => void startCall("video")}
+                    type="button"
+                  >
+                    <Video className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : null}
               <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase"><UsersRound className="h-4 w-4" />{selectedConversation.type}</div>
             </header>
             <div className="message-scroll mt-4 flex-1 overflow-y-auto px-1">
@@ -510,6 +560,18 @@ export function ChatShell({
           <button className="w-full rounded-[22px] bg-slate-950 px-5 py-4 text-sm font-semibold text-white transition hover:bg-slate-800" type="submit">Save profile</button>
         </form>
       </Modal>
+      <CallPanels
+        activeCall={activeCall}
+        incomingCall={incomingCall}
+        localVideoRef={localVideoRef}
+        onAccept={() => void acceptIncomingCall()}
+        onDecline={() => void declineIncomingCall()}
+        onEnd={() => void endCall()}
+        onToggleMute={toggleMute}
+        onToggleVideo={toggleVideo}
+        remoteAudioRef={remoteAudioRef}
+        remoteVideoRef={remoteVideoRef}
+      />
       <div className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-full max-w-sm flex-col gap-3">{toasts.map((toast) => <div key={toast.id} className="pointer-events-auto rounded-[24px] border border-white/50 bg-white/90 px-4 py-4 shadow-xl shadow-slate-950/10 backdrop-blur-md"><p className="text-sm font-semibold text-slate-900">{toast.title}</p><p className="mt-1 text-sm leading-6 text-slate-500">{toast.body}</p></div>)}</div>
     </main>
   );

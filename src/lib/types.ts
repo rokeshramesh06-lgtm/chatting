@@ -1,4 +1,26 @@
 export type AttachmentKind = "image" | "video" | "document";
+export type CallMode = "audio" | "video";
+export type CallStage =
+  | "invite"
+  | "accept"
+  | "decline"
+  | "end"
+  | "offer"
+  | "answer"
+  | "ice";
+
+export type CallSignalPayload = {
+  sdp?: {
+    type: "offer" | "answer" | "pranswer" | "rollback";
+    sdp: string;
+  };
+  candidate?: {
+    candidate: string;
+    sdpMid: string | null;
+    sdpMLineIndex: number | null;
+    usernameFragment?: string | null;
+  } | null;
+} | null;
 
 export type SessionUser = {
   id: number;
@@ -84,4 +106,16 @@ export type RealtimeEvent =
       kind: "profile";
       broadcast: true;
       userId: number;
+    }
+  | {
+      kind: "call";
+      userIds: number[];
+      conversationId: number;
+      callId: string;
+      mode: CallMode;
+      stage: CallStage;
+      fromUserId: number;
+      fromUserName: string;
+      fromUserAvatarPath: string | null;
+      payload?: CallSignalPayload;
     };
